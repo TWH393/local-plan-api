@@ -2,7 +2,7 @@
 
 免费、开源发布用的 Windows 本地 ChatGPT 套餐兼容网关。用户在自己的电脑上完成官方 OAuth 登录，应用请求通过本机接口使用该用户获准的套餐能力。
 
-当前版本 0.2.5：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
+当前版本 0.2.6：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
 
 ## 开始使用
 
@@ -87,3 +87,5 @@ Token 用量记录支持最近 24 小时、7 天、30 天及全部记录，每�
 日常使用始终打开项目根目录的 `open.cmd`。已编译程序固定在 `dist/LocalPlanAPI/`，以后在原位置更新；保留完整文件夹。源码和版本记录使用当前工作区 Git 仓库管理，构建产物、虚拟环境及运行凭据不进入 Git。
 
 `python release.py` 只准备固定程序目录中的说明文件，不生成压缩包。只有需要分享给别人时才执行 `python release.py --zip`，导出固定名称 `output/local-plan-api/LocalPlanAPI-Windows.zip`，重复导出覆盖同一个文件。旧版压缩包已集中移至 `output/local-plan-api/archive/`。
+
+高级连接中分别展示通用地址 `/v1` 与应用兼容地址 `/compat/continue/v1`，每项提供独立复制按钮。AnythingLLM 手动连接时可使用应用兼容地址和本地通用密钥。
