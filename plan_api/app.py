@@ -19,9 +19,10 @@ from .runtime import Runtime
 from .storage import Store
 from .continue_connector import ContinueConnector,MODEL_ALIAS,MODEL_NAME
 from .startup import Startup
+from .anythingllm_connector import AnythingConnector
 
 
-def create_app(store=None,port=24664,auth=None,runtime=None,connector=None):
+def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anything_connector=None):
     origin=f'http://127.0.0.1:{port}'
     if auth is None:
         store=store or Store(Path(os.environ.get('LOCAL_PLAN_API_DATA_DIR',
@@ -29,6 +30,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None):
         auth=Auth(store,origin)
     runtime=runtime or Runtime(auth)
     connector=connector or ContinueConnector(auth.store,origin)
+    anything_connector=anything_connector or AnythingConnector(auth.store,origin)
     app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None)
     app.state.auth=auth;app.state.runtime=runtime
     sessions={}
@@ -73,9 +75,10 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None):
 
     def api_auth(request):
         keys=[auth.settings['api_key']]
-        if request.url.path.startswith('/compat/continue/v1/'):
-            key=auth.settings.get('application_keys',{}).get('continue')
-            if key:keys.append(key)
+        for application in ('continue','anythingllm'):
+            if request.url.path.startswith('/compat/'+application+'/v1/'):
+                key=auth.settings.get('application_keys',{}).get(application)
+                if key:keys.append(key)
         supplied=request.headers.get('authorization','').encode('utf-8')
         if not any(secrets.compare_digest(supplied,('Bearer '+key).encode('utf-8')) for key in keys):
             raise APIError(401,'invalid_api_key','本地 API 密钥无效。')
@@ -221,6 +224,49 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None):
         return {'ok':True,'model_name':MODEL_NAME,'default_model':auth.settings['selected_model'],
             'inference_tested':False,'message':'本地配置、专用密钥和账号模型目录检查通过；尚未发送模型测试。'}
 
+    @app.get('/admin/anythingllm')
+    async def anything_status(request:Request):
+        admin(request)
+        info=await asyncio.to_thread(anything_connector.status)
+        account=auth.accounts['items'].get(auth.accounts['active'],{})
+        info['bridge_ready']=bool(account.get('access_token') and 'chatgpt.tokens.use.direct' in account.get('scopes',[]))
+        return info
+
+    @app.post('/admin/anythingllm/connect')
+    async def anything_connect(request:Request):
+        admin(request)
+        choices=await runtime.models()
+        if not choices:raise APIError(409,'no_models','当前账号没有可用模型。')
+        if auth.settings['selected_model'] not in {m['id'] for m in choices}:
+            auth.settings['selected_model']=choices[0]['id']
+        keys=auth.settings.setdefault('application_keys',{})
+        key=keys.get('anythingllm') or secrets.token_urlsafe(32)
+        url=await asyncio.to_thread(anything_connector.connect,key)
+        keys['anythingllm']=key;auth.store.save('settings',auth.settings)
+        return {'url':url,'message':'已准备连接信息。请在 AnythingLLM 中点击 Use／使用确认保存，然后回本页检查连接。'}
+
+    @app.post('/admin/anythingllm/check')
+    async def anything_check(request:Request):
+        admin(request)
+        info=await asyncio.to_thread(anything_connector.status)
+        if info['restored']:
+            return {'ok':True,'message':'AnythingLLM 原配置已恢复，连接专用密钥已停用。','inference_tested':False}
+        if not info['configured']:raise APIError(409,'anythingllm_pending','请先在 AnythingLLM 中确认保存连接设置。')
+        entry=auth.store.load('anythingllm-connection',{})['entry']
+        if entry['settings']['GenericOpenAiKey']!=auth.settings.get('application_keys',{}).get('anythingllm'):
+            raise APIError(409,'anythingllm_key_changed','专用密钥已失效，请重新连接。')
+        if auth.settings['selected_model'] not in {m['id'] for m in await runtime.models()}:
+            raise APIError(409,'model_unavailable','请先选择当前账号可用模型。')
+        return {'ok':True,'inference_tested':False,'message':'AnythingLLM 配置、专用密钥和模型目录检查通过；未发送模型测试。'}
+
+    @app.post('/admin/anythingllm/undo')
+    async def anything_undo(request:Request):
+        admin(request)
+        url=await asyncio.to_thread(anything_connector.undo)
+        auth.settings.setdefault('application_keys',{}).pop('anythingllm',None)
+        auth.store.save('settings',auth.settings)
+        return {'url':url,'message':'专用连接已停用。请在 AnythingLLM 中点击 Use／使用确认恢复原配置；取消不会恢复配置。'}
+
     @app.post('/admin/stop')
     async def stop(request:Request):
         admin(request)
@@ -231,10 +277,11 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None):
 
     @app.get('/v1/models')
     @app.get('/compat/continue/v1/models')
+    @app.get('/compat/anythingllm/v1/models')
     async def models_api(request:Request):
         api_auth(request)
         entries=[{'id':m['id'],'object':'model','owned_by':'chatgpt-plan'} for m in await runtime.models()]
-        if request.url.path.startswith('/compat/continue/') and auth.settings['selected_model']:
+        if request.url.path.startswith('/compat/') and auth.settings['selected_model']:
             entries.insert(0,{'id':MODEL_ALIAS,'object':'model','owned_by':'local-plan-api'})
         return {'object':'list','data':entries}
 
@@ -284,6 +331,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None):
     @app.post('/v1/chat/completions')
     async def completions(request:Request):return await inference(request,True)
 
+    @app.post('/compat/anythingllm/v1/chat/completions')
     @app.post('/compat/continue/v1/chat/completions')
     async def continue_completions(request:Request):return await inference(request,True,True)
 

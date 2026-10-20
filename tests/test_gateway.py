@@ -79,6 +79,34 @@ class GatewayTests(unittest.TestCase):
         self.assertFalse(body['store']);self.assertTrue(body['stream'])
         self.assertEqual(self.runtime.stats()['completed'],1)
 
+    def test_anythingllm_preparation_scoped_key_and_disable_without_inference(self):
+        from plan_api.anythingllm_connector import AnythingConnector
+        folder=Path(self.temp.name)/'anything';folder.mkdir()
+        env=folder/'.env';original='LLM_PROVIDER=generic-openai\nGENERIC_OPEN_AI_BASE_PATH=https://old.example/v1\n'
+        env.write_text(original,encoding='utf-8')
+        anything=AnythingConnector(self.store,'http://127.0.0.1:24664',folder)
+        client=TestClient(create_app(auth=self.auth,runtime=self.runtime,connector=self.connector,anything_connector=anything),base_url='http://127.0.0.1:24664',client=('127.0.0.1',9999))
+        self.addCleanup(client.close)
+        self.assertEqual(client.post('/admin/anythingllm/connect',json={}).status_code,401)
+        client.get('/')
+        result=client.post('/admin/anythingllm/connect',json={})
+        self.assertEqual(result.status_code,200,result.text)
+        self.assertTrue(result.json()['url'].startswith('anythingllm://set-provider?'))
+        self.assertEqual(env.read_text(encoding='utf-8'),original)
+        self.assertEqual(self.runtime.stats()['requests'],0)
+        self.assertEqual(client.post('/admin/anythingllm/check',json={}).status_code,409)
+        key=self.auth.settings['application_keys']['anythingllm']
+        headers={'Authorization':'Bearer '+key}
+        self.assertEqual(client.get('/v1/models',headers=headers).status_code,401)
+        self.assertEqual(client.get('/compat/continue/v1/models',headers=headers).status_code,401)
+        self.assertEqual(client.get('/compat/anythingllm/v1/models',headers=headers).status_code,200)
+        r=client.post('/compat/anythingllm/v1/chat/completions',headers=headers,json={'model':MODEL_ALIAS,'temperature':0.5,'max_tokens':200,'messages':[{'role':'user','content':'hi'}]})
+        self.assertEqual(r.status_code,200,r.text)
+        self.assertEqual(json.loads(self.seen[-1].content)['model'],'test-model')
+        self.assertEqual(client.post('/admin/anythingllm/undo',json={}).status_code,200)
+        self.assertEqual(client.get('/compat/anythingllm/v1/models',headers=headers).status_code,401)
+        self.assertEqual(env.read_text(encoding='utf-8'),original)
+
     def test_usage_history_protected_paginated_and_unreported(self):
         self.assertEqual(self.client.get('/admin/usage').status_code,401)
         self.client.get('/')

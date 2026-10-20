@@ -2,7 +2,7 @@
 
 免费、开源发布用的 Windows 本地 ChatGPT 套餐兼容网关。用户在自己的电脑上完成官方 OAuth 登录，应用请求通过本机接口使用该用户获准的套餐能力。
 
-当前版本 0.2.6：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
+当前版本 0.3.0：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
 
 ## 开始使用
 
@@ -89,3 +89,13 @@ Token 用量记录支持最近 24 小时、7 天、30 天及全部记录，每�
 `python release.py` 只准备固定程序目录中的说明文件，不生成压缩包。只有需要分享给别人时才执行 `python release.py --zip`，导出固定名称 `output/local-plan-api/LocalPlanAPI-Windows.zip`，重复导出覆盖同一个文件。旧版压缩包已集中移至 `output/local-plan-api/archive/`。
 
 高级连接中分别展示通用地址 `/v1` 与应用兼容地址 `/compat/continue/v1`，每项提供独立复制按钮。AnythingLLM 手动连接时可使用应用兼容地址和本地通用密钥。
+
+## AnythingLLM 桌面版连接
+
+应用连接区增加独立折叠卡片，支持连接、检查、停用并恢复原配置。需要桌面版 1.18+，通过官方 `anythingllm://set-provider` 链接预填配置，在 AnythingLLM 中点击 Use／使用后才保存。桥不直接修改应用文件，不重启应用；原 LLM 设置加密保存在桥的数据目录。
+
+独立地址为 `/compat/anythingllm/v1`，使用单独生成的本地密钥和 `local-plan-default` 模型别名。应用明确指定的工作区模型优先。嵌入模型、向量数据库、文档不改动。检查验证配置和官方模型目录，不发送推理请求。
+
+“停用并恢复原配置”会立即撤销专用密钥，并打开原配置的确认页；需要在 AnythingLLM 内确认才能恢复。如果取消，原配置不会恢复，可以再次点击此按钮。手动修改过 LLM 设置时拒绝覆盖。仅支持标准本机数据目录；Docker、云端或自定义数据目录暂不自动连接。
+
+官方链接说明：https://docs.anythingllm.com/installation-desktop/deep-links 。
