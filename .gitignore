@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+*.bin
+*.sqlite3*
+*.log
+dist/
+build/
+*.spec
+
+dist-next/
+build-next/
+*.zip
