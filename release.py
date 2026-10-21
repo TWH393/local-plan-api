@@ -20,7 +20,7 @@ def archive(path,files,prefix,base):
             z.write(file,str(Path(prefix)/relative))
 # Source history belongs in Git; do not generate a source ZIP for each version.
 portable=root/'dist/LocalPlanAPI'
-for name in ('README.md','LICENSE'):shutil.copy2(root/name,portable/name)
+for name in ('README.md','README.en.md','LICENSE'):shutil.copy2(root/name,portable/name)
 if args.zip:
     archive(output/'LocalPlanAPI-Windows.zip',[p for p in portable.rglob('*') if p.is_file()],'LocalPlanAPI',portable)
 print('Ready: '+str(portable/'LocalPlanAPI.exe'))
