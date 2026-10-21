@@ -60,7 +60,12 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
 
     @app.middleware('http')
     async def guard(request,call_next):
-        if (request.headers.get('host')!=f'127.0.0.1:{port}' or
+        docker_api=(request.headers.get('host')==f'host.docker.internal:{port}' and
+            (request.method,request.url.path) in {
+                ('GET','/compat/openwebui/v1/models'),('POST','/compat/openwebui/v1/chat/completions')} and
+            bool(auth.settings.get('application_keys',{}).get('openwebui')) and
+            request.headers.get('origin') is None)
+        if ((request.headers.get('host')!=f'127.0.0.1:{port}' and not docker_api) or
                 (request.client and request.client.host!='127.0.0.1') or
                 request.headers.get('origin') not in (None,origin)):
             return JSONResponse(APIError(403,'loopback_only','仅允许本机访问。').body(),status_code=403)
@@ -76,6 +81,10 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
 
     def api_auth(request):
         keys=[auth.settings['api_key']]
+        if request.url.path.startswith('/compat/openwebui/v1/'):
+            keys=[]
+            key=auth.settings.get('application_keys',{}).get('openwebui')
+            if key:keys.append(key)
         for application in ('continue','anythingllm'):
             if request.url.path.startswith('/compat/'+application+'/v1/'):
                 key=auth.settings.get('application_keys',{}).get(application)
@@ -281,6 +290,33 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         auth.store.save('settings',auth.settings)
         return {'url':url,'message':'专用连接已停用。请在 AnythingLLM 中点击 Use／使用确认恢复原配置；取消不会恢复配置。'}
 
+    @app.get('/admin/openwebui')
+    async def openwebui_status(request:Request):
+        admin(request)
+        key=auth.settings.get('application_keys',{}).get('openwebui','')
+        account=auth.accounts['items'].get(auth.accounts['active'],{})
+        return {'enabled':bool(key),'api_key':key,
+                'api_base':f'http://host.docker.internal:{port}/compat/openwebui/v1',
+                'bridge_ready':bool(account.get('access_token') and 'chatgpt.tokens.use.direct' in account.get('scopes',[]))}
+
+    @app.post('/admin/openwebui/enable')
+    async def openwebui_enable(request:Request):
+        admin(request)
+        choices=await runtime.models()
+        if not choices:raise APIError(409,'no_models','当前账号没有可用模型。')
+        if auth.settings['selected_model'] not in {m['id'] for m in choices}:
+            auth.settings['selected_model']=next((m['id'] for m in choices if m['id']=='gpt-6-luna'),choices[0]['id'])
+        auth.settings.setdefault('application_keys',{}).setdefault('openwebui',secrets.token_urlsafe(32))
+        auth.store.save('settings',auth.settings)
+        return {'ok':True}
+
+    @app.post('/admin/openwebui/disable')
+    async def openwebui_disable(request:Request):
+        admin(request)
+        auth.settings.setdefault('application_keys',{}).pop('openwebui',None)
+        auth.store.save('settings',auth.settings)
+        return {'ok':True}
+
     @app.post('/admin/stop')
     async def stop(request:Request):
         admin(request)
@@ -291,6 +327,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
 
     @app.get('/v1/models')
     @app.get('/compat/continue/v1/models')
+    @app.get('/compat/openwebui/v1/models')
     @app.get('/compat/anythingllm/v1/models')
     async def models_api(request:Request):
         api_auth(request)
@@ -303,6 +340,8 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         api_auth(request);value=await body(request)
         ignored=[]
         if continue_profile:value,ignored=continue_request(value)
+        if request.url.path.startswith('/compat/openwebui/v1/') and 'user' in value:
+            value.pop('user');ignored.append('user')
         response_headers={'X-Local-Plan-Ignored-Parameters':','.join(ignored)} if ignored else {}
         stream=value.get('stream',False)
         if not isinstance(stream,bool):raise APIError(400,'invalid_stream','stream 必须为布尔值。')
@@ -347,6 +386,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
     @app.post('/v1/chat/completions')
     async def completions(request:Request):return await inference(request,True)
 
+    @app.post('/compat/openwebui/v1/chat/completions')
     @app.post('/compat/anythingllm/v1/chat/completions')
     @app.post('/compat/continue/v1/chat/completions')
     async def continue_completions(request:Request):return await inference(request,True,True)

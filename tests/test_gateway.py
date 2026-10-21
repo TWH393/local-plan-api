@@ -104,6 +104,26 @@ class GatewayTests(unittest.TestCase):
         self.assertFalse(body['store']);self.assertTrue(body['stream'])
         self.assertEqual(self.runtime.stats()['completed'],1)
 
+    def test_docker_channel_limits_host_routes_keys_and_methods(self):
+        docker={'Host':'host.docker.internal:24664'}
+        self.assertEqual(self.client.get('/compat/openwebui/v1/models',headers=docker).status_code,403)
+        self.client.get('/')
+        self.assertEqual(self.client.post('/admin/openwebui/enable',json={}).status_code,200)
+        key=self.auth.settings['application_keys']['openwebui']
+        headers={**docker,'Authorization':'Bearer '+key}
+        self.assertEqual(self.client.get('/compat/openwebui/v1/models',headers=headers).status_code,200)
+        for path in ('/','/health','/admin/status','/v1/models','/compat/continue/v1/models'):
+            self.assertEqual(self.client.get(path,headers=headers).status_code,403,path)
+        self.assertEqual(self.client.get('/compat/openwebui/v1/models',headers={**docker,**self.headers}).status_code,401)
+        self.assertEqual(self.client.get('/v1/models',headers={'Authorization':'Bearer '+key}).status_code,401)
+        self.assertEqual(self.client.get('/compat/openwebui/v1/models',headers={**headers,'Origin':'http://localhost:3000'}).status_code,403)
+        self.assertEqual(self.client.options('/compat/openwebui/v1/models',headers=headers).status_code,403)
+        r=self.client.post('/compat/openwebui/v1/chat/completions',headers=headers,json={'model':MODEL_ALIAS,'temperature':0.8,'user':{'id':'private-user'},'messages':[{'role':'user','content':'hi'}]})
+        self.assertEqual(r.status_code,200,r.text)
+        self.assertNotIn('private-user',self.seen[-1].content.decode())
+        self.assertEqual(self.client.post('/admin/openwebui/disable',json={}).status_code,200)
+        self.assertEqual(self.client.get('/compat/openwebui/v1/models',headers=headers).status_code,403)
+
     def test_anythingllm_preparation_scoped_key_and_disable_without_inference(self):
         from plan_api.anythingllm_connector import AnythingConnector
         folder=Path(self.temp.name)/'anything';folder.mkdir()

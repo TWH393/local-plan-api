@@ -2,7 +2,7 @@
 
 免费、开源发布用的 Windows 本地 ChatGPT 套餐兼容网关。用户在自己的电脑上完成官方 OAuth 登录，应用请求通过本机接口使用该用户获准的套餐能力。
 
-当前版本 0.3.1：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
+当前版本 0.3.2：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
 
 ## 开始使用
 
@@ -105,3 +105,9 @@ Token 用量记录支持最近 24 小时、7 天、30 天及全部记录，每�
 模型栏增加“自动跟随更新”开关，默认关闭，开启或关闭立即保存。支持命名为 `gpt-数字版本-luna/sol/astra/terra` 的稳定型号，只在同系列中按数值版本升级，不跨系列、不降级，排除预览、日期快照及其他无法识别的名称。当前账号必须实际开放目标型号。换账号或重新登录后重置开关。
 
 刷新模型目录时检查，目录缓存最长 5 分钟；默认模型别名或省略模型的新请求会先刷新到期的目录，再决定型号。页面关闭时不在后台定时轮询，下一次相关请求才检查。更新结果及最近一次切换显示在模型栏，已进行中的请求与应用明确指定型号的请求保持不变。新型号的真实效果和接口兼容性仍由上游决定。
+
+## Open WebUI / Windows Docker Desktop
+
+在 Open WebUI（Docker）卡片启用专用连接，复制地址 `http://host.docker.internal:24664/compat/openwebui/v1` 和专用密钥，在 Open WebUI 管理员设置的 OpenAI API 连接中保存。模型 ID 可留空，聊天时选择 `local-plan-default` 跟随桥的默认值。不要使用浏览器 Direct Connections。
+
+只监听原有 127.0.0.1 地址。对 Windows Docker Desktop 的本机转发，仅在启用专用密钥后允许 host.docker.internal 主机名访问该应用的 GET models / POST chat/completions。其他路由、外部 Origin、非本机来源仍拒绝；通用 API 密钥不能用于此入口。禁用立即撤销专用密钥，不改其他应用。该路径取决于 Docker Desktop 本机转发机制，不宣称兼容其他 Docker 网络环境。
