@@ -24,9 +24,10 @@ from .model_follow import identify,follow_latest
 from .openwebui_connector import OpenWebUIConnector
 from .cline_connector import ClineConnector,ClineVSCodeConnector
 from .harness_connector import HarnessConnector
+from .astrbot_connector import AstrBotConnector
 
 
-def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anything_connector=None,openwebui_connector=None,cline_connector=None,cline_vscode_connector=None,harness_connector=None):
+def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anything_connector=None,openwebui_connector=None,cline_connector=None,cline_vscode_connector=None,harness_connector=None,astrbot_connector=None):
     origin=f'http://127.0.0.1:{port}'
     if auth is None:
         store=store or Store(Path(os.environ.get('LOCAL_PLAN_API_DATA_DIR',
@@ -39,6 +40,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
     cline_connector=cline_connector or ClineConnector(auth.store,origin)
     cline_vscode_connector=cline_vscode_connector or ClineVSCodeConnector(auth.store,origin)
     harness_connector=harness_connector or HarnessConnector(auth.store,origin)
+    astrbot_connector=astrbot_connector or AstrBotConnector(auth.store,origin)
     app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None)
     app.state.auth=auth;app.state.runtime=runtime
     sessions={}
@@ -92,7 +94,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
             keys=[]
             key=auth.settings.get('application_keys',{}).get('openwebui')
             if key:keys.append(key)
-        for application in ('continue','anythingllm','cline','cline-vscode','harness'):
+        for application in ('continue','anythingllm','cline','cline-vscode','harness','astrbot'):
             if request.url.path.startswith('/compat/'+application+'/v1/'):
                 key=auth.settings.get('application_keys',{}).get(application)
                 if key:keys.append(key)
@@ -340,6 +342,49 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         result['message']='已移除 Cline（VS Code）专用提供商并停用密钥。'
         return result
 
+    @app.get('/admin/astrbot')
+    async def astrbot_status(request:Request):
+        admin(request)
+        info=await asyncio.to_thread(astrbot_connector.status)
+        account=auth.accounts['items'].get(auth.accounts['active'],{})
+        info['bridge_ready']=bool(account.get('access_token') and 'chatgpt.tokens.use.direct' in account.get('scopes',[]))
+        return info
+
+    @app.post('/admin/astrbot/connect')
+    async def astrbot_connect(request:Request):
+        admin(request)
+        choices=await runtime.models()
+        if not choices:raise APIError(409,'no_models','当前账号没有可用模型。')
+        if auth.settings['selected_model'] not in {m['id'] for m in choices}:
+            auth.settings['selected_model']=choices[0]['id']
+        keys=auth.settings.setdefault('application_keys',{})
+        keys.setdefault('astrbot',secrets.token_urlsafe(32))
+        auth.store.save('settings',auth.settings)
+        result=await asyncio.to_thread(astrbot_connector.connect,keys['astrbot'])
+        result['message']='AstrBot 配置已写入。请重启 AstrBot，再选择 local-plan-api/local-plan-default；原默认模型保持不变。'
+        return result
+
+    @app.post('/admin/astrbot/check')
+    async def astrbot_check(request:Request):
+        admin(request)
+        info=await asyncio.to_thread(astrbot_connector.status)
+        if not info['configured']:raise APIError(409,'astrbot_pending',info['error'] or '请先完成 AstrBot 一键配置。')
+        entry=auth.store.load('astrbot-connection',{})
+        if entry['entries']['provider_sources']['key']!=[auth.settings.get('application_keys',{}).get('astrbot')]:
+            raise APIError(409,'astrbot_key','AstrBot 专用密钥已失效，请重新配置。')
+        if auth.settings['selected_model'] not in {m['id'] for m in await runtime.models()}:
+            raise APIError(409,'model_unavailable','请先选择当前账号可用模型。')
+        return {'ok':True,'inference_tested':False,'message':'AstrBot 配置、专用密钥和模型目录检查通过。重启 AstrBot 后加载；未发送模型测试。'}
+
+    @app.post('/admin/astrbot/undo')
+    async def astrbot_undo(request:Request):
+        admin(request)
+        result=await asyncio.to_thread(astrbot_connector.undo)
+        auth.settings.setdefault('application_keys',{}).pop('astrbot',None)
+        auth.store.save('settings',auth.settings)
+        result['message']='AstrBot 专用连接已移除并停用密钥，请重启 AstrBot。'
+        return result
+
     @app.get('/admin/harness')
     async def harness_status(request:Request):
         admin(request)
@@ -480,6 +525,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         return JSONResponse({'ok':True},background=BackgroundTask(hook))
 
     @app.get('/v1/models')
+    @app.get('/compat/astrbot/v1/models')
     @app.get('/compat/harness/v1/models')
     @app.get('/compat/cline-vscode/v1/models')
     @app.get('/compat/cline/v1/models')
@@ -545,6 +591,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
 
     @app.post('/compat/openwebui/v1/chat/completions')
     @app.post('/compat/anythingllm/v1/chat/completions')
+    @app.post('/compat/astrbot/v1/chat/completions')
     @app.post('/compat/harness/v1/chat/completions')
     @app.post('/compat/cline-vscode/v1/chat/completions')
     @app.post('/compat/cline/v1/chat/completions')

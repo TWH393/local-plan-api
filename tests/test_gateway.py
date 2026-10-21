@@ -75,6 +75,23 @@ class GatewayTests(unittest.TestCase):
         self.auth.settings['application_keys'].pop('cline')
         self.assertEqual(self.client.get('/compat/cline/v1/models',headers=headers).status_code,401)
 
+    def test_astrbot_profile_alias_and_parameter_conversion(self):
+        self.auth.settings['selected_model']='test-model'
+        self.auth.settings.setdefault('application_keys',{})['astrbot']='astrbot-key'
+        headers={'Authorization':'Bearer astrbot-key'}
+        r=self.client.get('/compat/astrbot/v1/models',headers=headers)
+        self.assertEqual(r.status_code,200,r.text)
+        self.assertIn(MODEL_ALIAS,[m['id'] for m in r.json()['data']])
+        r=self.client.post('/compat/astrbot/v1/chat/completions',headers=headers,json={
+            'model':MODEL_ALIAS,'messages':[{'role':'user','content':'hello'}],
+            'max_tokens':4096,'temperature':0,'stream':True})
+        self.assertEqual(r.status_code,200,r.text)
+        self.assertIn('data: [DONE]',r.text)
+        self.assertIn('max_tokens',r.headers['X-Local-Plan-Ignored-Parameters'])
+        self.assertEqual(self.client.get('/v1/models',headers=headers).status_code,401)
+        self.auth.settings['application_keys'].pop('astrbot')
+        self.assertEqual(self.client.get('/compat/astrbot/v1/models',headers=headers).status_code,401)
+
     def test_auth_host_origin_and_admin_guards(self):
         self.assertEqual(self.client.get('/v1/models').status_code,401)
         self.assertEqual(self.client.get('/admin/status').status_code,401)
