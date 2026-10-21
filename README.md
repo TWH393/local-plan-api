@@ -2,7 +2,7 @@
 
 免费、开源发布用的 Windows 本地 ChatGPT 套餐兼容网关。用户在自己的电脑上完成官方 OAuth 登录，应用请求通过本机接口使用该用户获准的套餐能力。
 
-当前版本 0.3.3：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
+当前版本 0.3.4：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
 
 ## 开始使用
 

@@ -105,10 +105,14 @@ class OpenWebUIConnector:
         try:
             if not self.inspect()['running']:raise APIError(409,'openwebui_docker','请先启动名为 open-webui 的 Docker 容器。')
             current=self.worker({'op':'read'});state=self.store.load('openwebui-connection',{})
-            if state and current not in (state['after'],state['original']):
+            missing=self.url not in current.get('api_base_urls',[])
+            if state and current not in (state['after'],state['original']) and not missing:
                 raise APIError(409,'openwebui_changed','Open WebUI 连接配置已被手动修改，未覆盖。可保留手动设置或仅停用专用密钥。')
             after=configured_section(current,self.url,key)
-            original=state['original'] if state else current
+            # An explicit reconnect may re-add a removed connection, preserving
+            # the current list as the new undo snapshot. Never overwrite an
+            # existing target whose URL/key/options were changed manually.
+            original=state['original'] if state and not missing else current
             if after==current and state and not state.get('pending_restart'):
                 return {'ok':True,'changed':False,'ready':True}
             recovery={'original':original,'after':after,'pending_restart':True}
@@ -117,7 +121,10 @@ class OpenWebUIConnector:
                 try:self.worker({'op':'write','expected':current,'replacement':after})
                 except BaseException:
                     self.store.save('openwebui-connection',state);raise
-            ready=self.restart();recovery['pending_restart']=not ready;self.store.save('openwebui-connection',recovery)
+            ready=self.restart()
+            if ready and self.worker({'op':'read'})!=after:
+                raise APIError(409,'openwebui_changed','Open WebUI 启动后连接配置发生变化，未确认成功。请刷新其设置页后重试。')
+            recovery['pending_restart']=not ready;self.store.save('openwebui-connection',recovery)
             return {'ok':True,'changed':current!=after,'ready':ready}
         finally:self.lock.release()
 

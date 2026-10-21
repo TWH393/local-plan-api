@@ -326,7 +326,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         if runtime.in_flight:raise APIError(409,'request_active','请求处理中，请结束后再配置。')
         await openwebui_enable(request)
         result=await asyncio.to_thread(openwebui_connector.connect,auth.settings['application_keys']['openwebui'])
-        result['message']='Open WebUI 已配置并重启，请刷新页面选择 local-plan-default。' if result['ready'] else '配置已保存，Open WebUI 尚在启动；请稍后刷新，或手动重启容器。'
+        result['message']='Open WebUI 已配置并重启。请先刷新 Open WebUI 页面，再选择 local-plan-default；不要直接保存旧设置页面。' if result['ready'] else '配置已保存，Open WebUI 尚在启动；请稍后刷新，或手动重启容器。'
         return result
 
     @app.post('/admin/openwebui/undo')

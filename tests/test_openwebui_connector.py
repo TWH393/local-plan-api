@@ -44,3 +44,21 @@ class WebUIConfigTests(unittest.TestCase):
  def test_worker_rejects_stale_write(self):
   with self.assertRaises(APIError):self.c.worker({'op':'write','expected':{},'replacement':{}})
   self.assertEqual(self.read()['openai'],self.original)
+
+ def test_reconnect_removed_connection_preserves_new_settings_and_undo(self):
+  self.c.connect('local-secret')
+  current=self.read()['openai']
+  removed={'enable':True,'api_base_urls':[],'api_keys':[],'api_configs':{}}
+  self.c.worker({'op':'write','expected':current,'replacement':removed})
+  self.assertFalse(self.c.status()['configured'])
+  self.c.connect('local-secret')
+  self.assertTrue(self.c.status()['configured'])
+  self.c.undo();self.assertEqual(self.read()['openai'],removed)
+ def test_post_restart_overwrite_is_not_reported_successful(self):
+  def restart():
+   current=self.read()['openai']
+   self.c.worker({'op':'write','expected':current,'replacement':self.original})
+   return True
+  self.c.restart=restart
+  with self.assertRaises(APIError):self.c.connect('local-secret')
+  self.assertTrue(self.store.load('openwebui-connection',{})['pending_restart'])
