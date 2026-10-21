@@ -22,9 +22,10 @@ from .startup import Startup
 from .anythingllm_connector import AnythingConnector
 from .model_follow import identify,follow_latest
 from .openwebui_connector import OpenWebUIConnector
+from .cline_connector import ClineConnector
 
 
-def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anything_connector=None,openwebui_connector=None):
+def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anything_connector=None,openwebui_connector=None,cline_connector=None):
     origin=f'http://127.0.0.1:{port}'
     if auth is None:
         store=store or Store(Path(os.environ.get('LOCAL_PLAN_API_DATA_DIR',
@@ -34,6 +35,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
     connector=connector or ContinueConnector(auth.store,origin)
     anything_connector=anything_connector or AnythingConnector(auth.store,origin)
     openwebui_connector=openwebui_connector or OpenWebUIConnector(auth.store,port)
+    cline_connector=cline_connector or ClineConnector(auth.store,origin)
     app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None)
     app.state.auth=auth;app.state.runtime=runtime
     sessions={}
@@ -87,7 +89,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
             keys=[]
             key=auth.settings.get('application_keys',{}).get('openwebui')
             if key:keys.append(key)
-        for application in ('continue','anythingllm'):
+        for application in ('continue','anythingllm','cline'):
             if request.url.path.startswith('/compat/'+application+'/v1/'):
                 key=auth.settings.get('application_keys',{}).get(application)
                 if key:keys.append(key)
@@ -249,6 +251,49 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         return {'ok':True,'model_name':MODEL_NAME,'default_model':auth.settings['selected_model'],
             'inference_tested':False,'message':'本地配置、专用密钥和账号模型目录检查通过；尚未发送模型测试。'}
 
+    @app.get('/admin/cline')
+    async def cline_status(request:Request):
+        admin(request)
+        info=await asyncio.to_thread(cline_connector.status)
+        account=auth.accounts['items'].get(auth.accounts['active'],{})
+        info['bridge_ready']=bool(account.get('access_token') and 'chatgpt.tokens.use.direct' in account.get('scopes',[]))
+        return info
+
+    @app.post('/admin/cline/connect')
+    async def cline_connect(request:Request):
+        admin(request)
+        choices=await runtime.models()
+        if not choices:raise APIError(409,'no_models','当前账号没有可用模型。')
+        if auth.settings['selected_model'] not in {m['id'] for m in choices}:
+            auth.settings['selected_model']=choices[0]['id']
+        keys=auth.settings.setdefault('application_keys',{})
+        keys.setdefault('cline',secrets.token_urlsafe(32))
+        auth.store.save('settings',auth.settings)
+        result=await asyncio.to_thread(cline_connector.connect,keys['cline'])
+        result['message']='Cline 配置已就绪。重新进入 Providers，选择 ChatGPT · Local Plan API；未出现时重开 Cline。'
+        return result
+
+    @app.post('/admin/cline/check')
+    async def cline_check(request:Request):
+        admin(request)
+        info=await asyncio.to_thread(cline_connector.status)
+        if not info['configured']:raise APIError(409,'cline_pending',info['error'] or '请先完成 Cline 一键配置。')
+        entry=auth.store.load('cline-connection',{})['entries']['providers.json']['settings']
+        if entry['apiKey']!=auth.settings.get('application_keys',{}).get('cline'):
+            raise APIError(409,'cline_key','Cline 专用密钥已失效，请重新配置。')
+        if auth.settings['selected_model'] not in {m['id'] for m in await runtime.models()}:
+            raise APIError(409,'model_unavailable','请先选择当前账号可用模型。')
+        return {'ok':True,'inference_tested':False,'message':'Cline 配置、专用密钥和模型目录检查通过；未发送模型测试。'}
+
+    @app.post('/admin/cline/undo')
+    async def cline_undo(request:Request):
+        admin(request)
+        result=await asyncio.to_thread(cline_connector.undo)
+        auth.settings.setdefault('application_keys',{}).pop('cline',None)
+        auth.store.save('settings',auth.settings)
+        result['message']='已移除桥添加的 Cline 提供商并停用专用密钥，原有提供商保留。'
+        return result
+
     @app.get('/admin/anythingllm')
     async def anything_status(request:Request):
         admin(request)
@@ -346,6 +391,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         return JSONResponse({'ok':True},background=BackgroundTask(hook))
 
     @app.get('/v1/models')
+    @app.get('/compat/cline/v1/models')
     @app.get('/compat/continue/v1/models')
     @app.get('/compat/openwebui/v1/models')
     @app.get('/compat/anythingllm/v1/models')
@@ -408,6 +454,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
 
     @app.post('/compat/openwebui/v1/chat/completions')
     @app.post('/compat/anythingllm/v1/chat/completions')
+    @app.post('/compat/cline/v1/chat/completions')
     @app.post('/compat/continue/v1/chat/completions')
     async def continue_completions(request:Request):return await inference(request,True,True)
 

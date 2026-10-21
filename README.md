@@ -2,7 +2,7 @@
 
 免费、开源发布用的 Windows 本地 ChatGPT 套餐兼容网关。用户在自己的电脑上完成官方 OAuth 登录，应用请求通过本机接口使用该用户获准的套餐能力。
 
-当前版本 0.3.4：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
+当前版本 0.3.5：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
 
 ## 开始使用
 
@@ -117,3 +117,11 @@ Token 用量记录支持最近 24 小时、7 天、30 天及全部记录，每�
 Open WebUI（Docker）卡片增加一键配置和撤销按钮。适用于当前 Windows Docker Desktop、容器名 `open-webui`、标准 `/app/backend/data/webui.db` SQLite 存储。连接配置先备份到桥的 DPAPI 加密存储；以事务和并发校验仅修改数据库的 OpenAI 连接部分，保留其他连接与数据，然后重启 Open WebUI 使配置生效。正在处理桥请求时拒绝配置。重复配置不会新增重复条目。后续手动修改过连接配置时，撤销会拒绝覆盖；仍可独立停用专用密钥。重启可能暂时断开网页连接，请先结束对话。模型选择仍由网页控制，请刷新并选择 `local-plan-default`。
 
 四款应用图标改为官方项目素材，来源与标识权属记录在 `plan_api/assets/README.md`，图片内置在页面中，运行时不访问外部图床。
+
+## Cline Desktop
+
+在应用连接中展开 Cline（桌面版），点击一键配置。工具在本机 Cline v1 格式的 `providers.json` 和 `models.json` 中添加独立的 **ChatGPT · Local Plan API** 提供商，不改动原来的提供商、账号或会话。重新进入 Cline 的 Providers 页面，选择此提供商和 `local-plan-default`；未出现时重开 Cline。
+
+连接使用 `/compat/cline/v1` 和专用密钥。检查连接只核对配置、密钥及模型目录，不发送推理请求。撤销会移除本工具添加的提供商并停用其密钥；如该提供商被手动修改，会拒绝覆盖。恢复记录使用 Windows DPAPI 加密。写入两个配置文件时若失败，会尝试回滚并保留重试信息。
+
+当前适配 Cline Desktop 的共享 v1 JSON 配置；不修改旧版 VS Code 扩展配置。自定义配置目录通过启动桥时的 `CLINE_DIR` 或 `CLINE_DATA_DIR` 指定。首次使用前请安装、启动 Cline 并完成初始设置。

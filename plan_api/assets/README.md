@@ -6,3 +6,5 @@ Official project artwork, used to identify the respective integrations. Logos re
 - openwebui: https://raw.githubusercontent.com/open-webui/open-webui/main/static/favicon.png
 - anythingllm: https://raw.githubusercontent.com/Mintplex-Labs/anything-llm/master/frontend/public/favicon.png
 - cherry: https://raw.githubusercontent.com/CherryHQ/cherry-studio/main/src/renderer/assets/images/logo.png
+
+- cline: official Cline Desktop distribution, `icons/app/classic.png` (https://github.com/cline/cline).
