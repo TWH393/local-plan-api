@@ -4,9 +4,22 @@
 
 当前版本 0.3.7：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
 
+## 当前状态
+
+本项目处于早期测试阶段，优先支持 Windows 本机使用。界面支持中文、English、模型与思考深度设置、用量记录及开机自启动。
+
+| 应用 | 当前进展 |
+|---|---|
+| Continue / AnythingLLM / Open WebUI | 已有用户环境连接验证，一键配置仍可能受应用版本影响 |
+| Cline Desktop / Cline VS Code | 已提供独立配置与撤销，部分客户端会话曾出现密钥加载问题，仍需继续实测 |
+| DeepSeek Harness | 已完成桌面 profile 配置写入，实际对话待用户验证 |
+| Cherry Studio | 提供下载入口和应用内登录说明 |
+
+“检查连接”只检查本地配置、密钥和模型目录，不会发送推理请求，也不代表所有工具功能都已验证。
+
 ## 开始使用
 
-1. 本机直接使用：双击项目根目录的 `open.cmd`；它会启动固定目录 `dist/LocalPlanAPI/LocalPlanAPI.exe` 并打开管理页。无需解压或安装 Python。源码运行：安装 Python 3.11+，双击 `start.cmd`。
+1. 从 GitHub 下载源码后：安装 Windows 版 Python 3.11+（包含 Python Launcher），双击 `start.cmd`，首次启动会创建虚拟环境并安装依赖。仓库不包含已编译的 EXE。若已自行构建便携版，可双击 `open.cmd` 启动 `dist/LocalPlanAPI/LocalPlanAPI.exe`。
 2. 本地页面点击 **Continue with ChatGPT**，在 OpenAI 官方网页登录、授权。
 3. 点击“一键连接 Continue”，自动检测本机标准安装、备份并填写配置；不必手动复制地址、密钥或编辑 YAML。
 4. 首次连接后，在 Continue 模型列表选择 **ChatGPT · Local Plan API**。未出现时重新加载 VS Code 窗口。之后在桥页面切换默认模型即可，不用改 Continue 配置。

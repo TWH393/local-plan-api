@@ -11,3 +11,15 @@ build/
 dist-next/
 build-next/
 *.zip
+
+# Local accounts, credentials, and editor state
+.env
+.env.*
+!.env.example
+credentials*.json
+accounts*.json
+settings.bin
+.vscode/
+.idea/
+*.pem
+*.key
