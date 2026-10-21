@@ -125,7 +125,7 @@ Token 用量记录支持最近 24 小时、7 天、30 天及全部记录，每�
 
 只监听原有 127.0.0.1 地址。对 Windows Docker Desktop 的本机转发，仅在启用专用密钥后允许 host.docker.internal 主机名访问该应用的 GET models / POST chat/completions。其他路由、外部 Origin、非本机来源仍拒绝；通用 API 密钥不能用于此入口。禁用立即撤销专用密钥，不改其他应用。该路径取决于 Docker Desktop 本机转发机制，不宣称兼容其他 Docker 网络环境。
 
-## Open WebUI 一键配置与官方 Logo
+## Open WebUI 
 
 Open WebUI（Docker）卡片增加一键配置和撤销按钮。适用于当前 Windows Docker Desktop、容器名 `open-webui`、标准 `/app/backend/data/webui.db` SQLite 存储。连接配置先备份到桥的 DPAPI 加密存储；以事务和并发校验仅修改数据库的 OpenAI 连接部分，保留其他连接与数据，然后重启 Open WebUI 使配置生效。正在处理桥请求时拒绝配置。重复配置不会新增重复条目。后续手动修改过连接配置时，撤销会拒绝覆盖；仍可独立停用专用密钥。重启可能暂时断开网页连接，请先结束对话。模型选择仍由网页控制，请刷新并选择 `local-plan-default`。
 
