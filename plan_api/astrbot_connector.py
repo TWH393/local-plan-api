@@ -21,11 +21,24 @@ class AstrBotConnector:
         self.root=Path(root) if root else Path(os.environ['ASTRBOT_ROOT']) if os.environ.get('ASTRBOT_ROOT') else None
         self.lock=threading.Lock()
 
+    def instances(self):
+        return sorted(p.parent.parent.parent.name for p in (self.home/'.astrbot_launcher/instances').glob('*/core/data/cmd_config.json'))
+
+    def select(self,instance):
+        with self.lock:
+            if instance not in self.instances():raise APIError(400,'astrbot_location','AstrBot 实例不存在。')
+            if self.store.load('astrbot-connection',{}):raise APIError(409,'astrbot_changed','请先撤销当前 AstrBot 连接，再切换实例。')
+            self.store.save('astrbot-target',{'instance':instance})
+        return {'ok':True}
+
     def path(self):
         if self.root:return self.root/'data/cmd_config.json'
-        candidates=list((self.home/'.astrbot_launcher/instances').glob('*/core/data/cmd_config.json'))
+        instances=self.instances()
+        selected=self.store.load('astrbot-target',{}).get('instance')
+        if selected in instances:return self.home/'.astrbot_launcher/instances'/selected/'core/data/cmd_config.json'
+        candidates=[self.home/'.astrbot_launcher/instances'/i/'core/data/cmd_config.json' for i in instances]
         if len(candidates)!=1:
-            raise APIError(409,'astrbot_location','请先安装并启动 AstrBot；多个实例或自定义安装请通过 ASTRBOT_ROOT 指定 AstrBot 根目录。')
+            raise APIError(409,'astrbot_location','请先安装并启动 AstrBot；多个实例请先在卡片中选择；自定义安装可通过 ASTRBOT_ROOT 指定根目录。')
         return candidates[0]
 
     def read(self):
@@ -53,6 +66,9 @@ class AstrBotConnector:
         result={'installed':False,'configured':False,'can_undo':False,'needs_restart':False,'error':''}
         with self.lock:
             state=self.store.load('astrbot-connection',{});result['can_undo']=bool(state)
+            result['instances']=[] if self.root else self.instances()
+            result['instance']=self.store.load('astrbot-target',{}).get('instance','')
+            if not result['instance'] and len(result['instances'])==1:result['instance']=result['instances'][0]
             try:
                 _,_,doc=self.read();result['installed']=True
                 result['configured']=bool(state and self.owned(doc)==state['entries'])

@@ -155,7 +155,7 @@ Reopen Harness' model settings and select **ChatGPT · Local Plan API** / `local
 
 ## AstrBot
 
-Expand the AstrBot card and click **Configure AstrBot**. The gateway detects a single Windows AstrBot Launcher instance and adds the `local-plan-api` provider and `local-plan-api/local-plan-default` model, using `/compat/astrbot/v1` with a dedicated local key. For other local installations, set `ASTRBOT_ROOT` before starting the gateway to the AstrBot root containing `data/cmd_config.json`. Multiple instances require an explicit root. Docker, WSL and remote instances are not configured automatically.
+Expand the AstrBot card and click **Configure AstrBot**. The gateway detects a single Windows AstrBot Launcher instance and adds the `local-plan-api` provider and `local-plan-api/local-plan-default` model, using `/compat/astrbot/v1` with a dedicated local key. For other local installations, set `ASTRBOT_ROOT` before starting the gateway to the AstrBot root containing `data/cmd_config.json`. Select the target instance on the card if multiple instances are found. Docker, WSL and remote instances are not configured automatically.
 
 **Restart AstrBot after setup, before saving its settings**, so the old process cannot overwrite the new configuration. Then select **local-plan-api/local-plan-default** in AstrBot's provider/model selector. Existing defaults, providers, QQ/WeChat platforms and plugins are preserved. The gateway does not switch the bot's model or restart the bot automatically. The alias follows the model selected on the gateway page.
 

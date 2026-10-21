@@ -155,7 +155,7 @@ Open WebUI（Docker）卡片增加一键配置和撤销按钮。适用于当前 
 
 ## AstrBot
 
-展开 AstrBot 卡片，点击 **一键配置 AstrBot**。自动检测 Windows AstrBot Launcher 的单个实例，新增 `local-plan-api` 提供商和 `local-plan-api/local-plan-default` 模型，使用 `/compat/astrbot/v1` 专用入口与独立本地密钥。其他本机安装可在启动桥前设置 `ASTRBOT_ROOT`，指向包含 `data/cmd_config.json` 的 AstrBot 根目录。多个实例必须明确指定；暂不自动配置 Docker、WSL 或远程实例。
+展开 AstrBot 卡片，点击 **一键配置 AstrBot**。自动检测 Windows AstrBot Launcher 的单个实例，新增 `local-plan-api` 提供商和 `local-plan-api/local-plan-default` 模型，使用 `/compat/astrbot/v1` 专用入口与独立本地密钥。其他本机安装可在启动桥前设置 `ASTRBOT_ROOT`，指向包含 `data/cmd_config.json` 的 AstrBot 根目录。多个实例先在卡片中选择目标实例；暂不自动配置 Docker、WSL 或远程实例。
 
 **写入后先重启 AstrBot，再保存 AstrBot 的设置**，避免旧进程覆盖新配置。然后在 AstrBot 服务提供商/模型选择中选择 **local-plan-api/local-plan-default**。原默认模型、其他提供商、QQ/微信平台和插件配置保留，不会自动切换机器人模型或重启机器人。默认别名跟随桥页面的模型设置。
 

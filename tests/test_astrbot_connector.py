@@ -44,3 +44,16 @@ class AstrBotTests(unittest.TestCase):
         with self.assertRaises(OSError):self.c.connect('secret')
         self.c.replace=replace;self.c.connect('secret')
         self.assertEqual(len(self.read()['provider_sources']),2)
+
+    def test_multiple_instances_require_explicit_selection(self):
+        for instance in ('one','two'):
+            dest=self.root/'.astrbot_launcher/instances'/instance/'core/data'
+            dest.mkdir(parents=True);(dest/'cmd_config.json').write_text(json.dumps(self.doc))
+        c=AstrBotConnector(MemoryStore(self.root),'http://127.0.0.1:24664',home=self.root)
+        self.assertFalse(c.status()['installed'])
+        self.assertEqual(c.status()['instances'],['one','two'])
+        c.select('two');c.connect('secret')
+        self.assertTrue(c.status()['configured'])
+        untouched=json.loads((self.root/'.astrbot_launcher/instances/one/core/data/cmd_config.json').read_text())
+        self.assertEqual(untouched,self.doc)
+        with self.assertRaises(APIError):c.select('one')

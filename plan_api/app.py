@@ -350,6 +350,11 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         info['bridge_ready']=bool(account.get('access_token') and 'chatgpt.tokens.use.direct' in account.get('scopes',[]))
         return info
 
+    @app.post('/admin/astrbot/target')
+    async def astrbot_target(request:Request):
+        admin(request);value=await body(request)
+        return await asyncio.to_thread(astrbot_connector.select,value.get('instance'))
+
     @app.post('/admin/astrbot/connect')
     async def astrbot_connect(request:Request):
         admin(request)
