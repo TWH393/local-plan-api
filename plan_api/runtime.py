@@ -10,6 +10,7 @@ import httpx
 from .auth import API
 from .errors import APIError
 from .continue_connector import MODEL_ALIAS
+from .model_follow import follow_latest
 
 
 async def sse_events(response):
@@ -76,6 +77,8 @@ class Runtime:
         items=[{'id':m['slug'],'name':m.get('display_name',m['slug'])} for m in body['models']
                if isinstance(m,dict) and m.get('visibility')=='list' and m.get('slug')]
         self.catalog[identity]=(time.time(),items)
+        if identity==self.auth.accounts['active'] and follow_latest(self.auth.settings,items):
+            self.auth.store.save('settings',self.auth.settings)
         return items
 
     @staticmethod

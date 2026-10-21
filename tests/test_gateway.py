@@ -35,7 +35,7 @@ class GatewayTests(unittest.TestCase):
             self.seen.append(request)
             if request.url.path.endswith('/models'):
                 return httpx.Response(200,json={'models':[{'slug':'test-model','visibility':'list','display_name':'Test Model'},
-                    {'slug':'hidden','visibility':'hidden'}]})
+                    {'slug':'hidden','visibility':'hidden'}]+getattr(self,'extra_models',[])})
             if self.mode=='http_error':return httpx.Response(429,json={'error':{'code':'subscription_sharing_usage_limit_exceeded'}})
             events=[{'type':'response.created','response':{'id':'r1'}},
                 {'type':'response.output_text.delta','delta':'Hello'},
@@ -67,6 +67,31 @@ class GatewayTests(unittest.TestCase):
         self.client.get('/')
         status=self.client.get('/admin/status').json()
         self.assertIn('api_key',status);self.assertNotIn('fake-oauth-secret',json.dumps(status))
+
+    def test_auto_follow_updates_before_alias_request_but_preserves_explicit_model(self):
+        self.extra_models=[{'slug':m,'visibility':'list'} for m in ('gpt-6-luna','gpt-6.1-luna','gpt-9-sol')]
+        self.auth.settings.update(selected_model='gpt-6-luna',auto_follow=True)
+        r=self.post('/v1/responses',{'model':MODEL_ALIAS,'input':'hi'})
+        self.assertEqual(r.status_code,200,r.text)
+        self.assertEqual(json.loads(self.seen[-1].content)['model'],'gpt-6.1-luna')
+        self.assertEqual(self.store.data['settings']['selected_model'],'gpt-6.1-luna')
+        r=self.post('/v1/responses',{'model':'gpt-6-luna','input':'hi'})
+        self.assertEqual(r.status_code,200,r.text)
+        self.assertEqual(json.loads(self.seen[-1].content)['model'],'gpt-6-luna')
+
+    def test_model_follow_toggle_validation_and_persistence(self):
+        self.client.get('/')
+        self.extra_models=[{'slug':m,'visibility':'list'} for m in ('gpt-6-luna','gpt-6.2-luna')]
+        r=self.client.post('/admin/model',json={'model':'gpt-6-luna','auto_follow':True})
+        self.assertEqual(r.status_code,200,r.text)
+        self.assertEqual(self.auth.settings['selected_model'],'gpt-6.2-luna')
+        self.assertTrue(self.store.data['settings']['auto_follow'])
+        r=self.client.post('/admin/model',json={'model':'gpt-6.2-luna','auto_follow':False})
+        self.assertEqual(r.status_code,200,r.text)
+        self.assertFalse(self.auth.settings['auto_follow'])
+        r=self.client.post('/admin/model',json={'model':'test-model','auto_follow':True})
+        self.assertEqual(r.status_code,400)
+        self.assertFalse(self.auth.settings['auto_follow'])
 
     def test_models_and_nonstream_responses(self):
         catalog=self.client.get('/v1/models',headers=self.headers).json()

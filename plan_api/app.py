@@ -20,6 +20,7 @@ from .storage import Store
 from .continue_connector import ContinueConnector,MODEL_ALIAS,MODEL_NAME
 from .startup import Startup
 from .anythingllm_connector import AnythingConnector
+from .model_follow import identify,follow_latest
 
 
 def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anything_connector=None):
@@ -119,6 +120,8 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
             'api_base':origin+'/v1','api_key':auth.settings['api_key'],'in_flight':runtime.in_flight,
             'continue_api_base':origin+'/compat/continue/v1',
             'reasoning_effort':auth.settings.get('reasoning_effort',''),
+            'auto_follow':auth.settings.get('auto_follow',False),
+            'model_update':auth.settings.get('model_update'),
             'usage':runtime.stats()}
 
     @app.post('/admin/login')
@@ -133,7 +136,10 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         return RedirectResponse('/',303)
 
     @app.get('/admin/models')
-    async def models_admin(request:Request):admin(request);return {'models':await runtime.models(force=True)}
+    async def models_admin(request:Request):
+        admin(request)
+        choices=await runtime.models(force=True)
+        return {'models':choices,'model':auth.settings['selected_model'],'model_update':auth.settings.get('model_update')}
 
     @app.get('/admin/usage')
     async def usage_admin(request:Request):
@@ -152,8 +158,15 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         effort=value.get('reasoning_effort',auth.settings.get('reasoning_effort',''))
         if effort not in ('','low','medium','high'):
             raise APIError(400,'invalid_reasoning_effort','请选择自动、低、中或高思考深度。')
+        enabled=value.get('auto_follow',auth.settings.get('auto_follow',False))
+        if type(enabled) is not bool:raise APIError(400,'invalid_auto_follow','自动更新开关必须为布尔值。')
+        if enabled and not identify(model):raise APIError(400,'unsupported_model_family','该模型命名暂不支持自动跟随，请使用固定型号。')
+        if model!=auth.settings['selected_model']:auth.settings.pop('model_update',None)
+        auth.settings['auto_follow']=enabled
         auth.settings['reasoning_effort']=effort
-        auth.settings['selected_model']=model;auth.store.save('settings',auth.settings)
+        auth.settings['selected_model']=model
+        follow_latest(auth.settings,await runtime.models())
+        auth.store.save('settings',auth.settings)
         return {'ok':True}
 
     @app.post('/admin/account')
@@ -162,6 +175,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         if runtime.in_flight:raise APIError(409,'request_active','请求处理中，请结束后再切换账号。')
         if value.get('id') not in auth.accounts['items']:raise APIError(400,'invalid_account','账号不存在。')
         auth.accounts['active']=value['id'];auth.settings['selected_model']=''
+        auth.settings['auto_follow']=False;auth.settings.pop('model_update',None)
         auth.store.save('accounts',auth.accounts);auth.store.save('settings',auth.settings);runtime.catalog.clear()
         return {'ok':True}
 
@@ -295,6 +309,8 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         options=value.get('stream_options') or {}
         if not isinstance(options,dict):raise APIError(400,'invalid_stream_options','stream_options 必须为对象。')
         payload=chat_to_responses(value) if chat else value
+        if auth.settings.get('auto_follow') and payload.get('model') in (None,'',MODEL_ALIAS):
+            await runtime.models()
         payload=runtime.normalize(payload)
         events=runtime.events(payload,request)
         try:

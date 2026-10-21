@@ -112,6 +112,8 @@ class Auth:
             'scopes':value.get('scope','').split(), 'expires_at':time.time()+int(value.get('expires_in',3600))}
         self.accounts['active'] = identity
         self.settings['selected_model'] = ''
+        self.settings['auto_follow'] = False
+        self.settings.pop('model_update',None)
         self.store.save('accounts',self.accounts);self.store.save('settings',self.settings)
 
     async def token(self, identity):
@@ -155,5 +157,6 @@ class Auth:
             except (httpx.HTTPError,APIError):pass
             self.accounts['items'].pop(identity,None)
         self.accounts['active']='';self.settings['selected_model']=''
+        self.settings['auto_follow']=False;self.settings.pop('model_update',None)
         self.store.save('accounts',self.accounts);self.store.save('settings',self.settings)
         return revoked
