@@ -314,7 +314,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         keys.setdefault('cline-vscode',secrets.token_urlsafe(32))
         auth.store.save('settings',auth.settings)
         result=await asyncio.to_thread(cline_vscode_connector.connect,keys['cline-vscode'])
-        result['message']='Cline（VS Code）配置已就绪。重新加载 VS Code 窗口，在 Cline 的 API Provider 选择 Local Plan Api Vscode，再选择 local-plan-default。'
+        result['message']='Cline（VS Code）配置已就绪。重新加载 VS Code 窗口，在 Cline 的 API Provider 选择 ChatGPT · Local Plan API，再选择 local-plan-default。'
         return result
 
     @app.post('/admin/cline-vscode/check')

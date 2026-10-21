@@ -128,4 +128,4 @@ Open WebUI（Docker）卡片增加一键配置和撤销按钮。适用于当前 
 
 ### Cline VS Code extension
 
-应用连接中的 Cline（VS Code）独立配置共享 v1 提供商目录，使用 `/compat/cline-vscode/v1` 和单独密钥。配置后重新加载 VS Code 窗口，在扩展 API Provider 选择 `Local Plan Api Vscode`，模型选择 `local-plan-default`。当前适配已检查的 Cline 4.1.25；旧扩展可能不读取该共享目录。它不直接修改 VS Code SQLite 状态库或加密密钥库，也不会自动发送测试消息。桌面版与扩展版可分别撤销。
+应用连接中的 Cline（VS Code）独立配置共享 v1 提供商目录，使用 `/compat/cline-vscode/v1` 和单独密钥。配置后重新加载 VS Code 窗口，在扩展 API Provider 选择 `ChatGPT · Local Plan API`，模型选择 `local-plan-default`。当前适配已检查的 Cline 4.1.25；旧扩展可能不读取该共享目录。它不直接修改 VS Code SQLite 状态库或加密密钥库，也不会自动发送测试消息。桌面版与扩展版可分别撤销。
