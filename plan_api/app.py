@@ -23,9 +23,10 @@ from .anythingllm_connector import AnythingConnector
 from .model_follow import identify,follow_latest
 from .openwebui_connector import OpenWebUIConnector
 from .cline_connector import ClineConnector,ClineVSCodeConnector
+from .harness_connector import HarnessConnector
 
 
-def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anything_connector=None,openwebui_connector=None,cline_connector=None,cline_vscode_connector=None):
+def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anything_connector=None,openwebui_connector=None,cline_connector=None,cline_vscode_connector=None,harness_connector=None):
     origin=f'http://127.0.0.1:{port}'
     if auth is None:
         store=store or Store(Path(os.environ.get('LOCAL_PLAN_API_DATA_DIR',
@@ -37,6 +38,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
     openwebui_connector=openwebui_connector or OpenWebUIConnector(auth.store,port)
     cline_connector=cline_connector or ClineConnector(auth.store,origin)
     cline_vscode_connector=cline_vscode_connector or ClineVSCodeConnector(auth.store,origin)
+    harness_connector=harness_connector or HarnessConnector(auth.store,origin)
     app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None)
     app.state.auth=auth;app.state.runtime=runtime
     sessions={}
@@ -90,7 +92,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
             keys=[]
             key=auth.settings.get('application_keys',{}).get('openwebui')
             if key:keys.append(key)
-        for application in ('continue','anythingllm','cline','cline-vscode'):
+        for application in ('continue','anythingllm','cline','cline-vscode','harness'):
             if request.url.path.startswith('/compat/'+application+'/v1/'):
                 key=auth.settings.get('application_keys',{}).get(application)
                 if key:keys.append(key)
@@ -338,6 +340,49 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         result['message']='已移除 Cline（VS Code）专用提供商并停用密钥。'
         return result
 
+    @app.get('/admin/harness')
+    async def harness_status(request:Request):
+        admin(request)
+        info=await asyncio.to_thread(harness_connector.status)
+        account=auth.accounts['items'].get(auth.accounts['active'],{})
+        info['bridge_ready']=bool(account.get('access_token') and 'chatgpt.tokens.use.direct' in account.get('scopes',[]))
+        return info
+
+    @app.post('/admin/harness/connect')
+    async def harness_connect(request:Request):
+        admin(request)
+        choices=await runtime.models()
+        if not choices:raise APIError(409,'no_models','当前账号没有可用模型。')
+        if auth.settings['selected_model'] not in {m['id'] for m in choices}:
+            auth.settings['selected_model']=choices[0]['id']
+        keys=auth.settings.setdefault('application_keys',{})
+        keys.setdefault('harness',secrets.token_urlsafe(32))
+        auth.store.save('settings',auth.settings)
+        result=await asyncio.to_thread(harness_connector.connect,keys['harness'])
+        result['message']='DeepSeek Harness 配置已就绪。重新打开 Harness 的模型设置，选择 ChatGPT · Local Plan API 和 local-plan-default；未出现时重开 Harness。'
+        return result
+
+    @app.post('/admin/harness/check')
+    async def harness_check(request:Request):
+        admin(request)
+        info=await asyncio.to_thread(harness_connector.status)
+        if not info['configured']:raise APIError(409,'harness_pending',info['error'] or '请先完成 Harness 一键配置。')
+        entry=auth.store.load('harness-connection',{})
+        if entry['key']!=auth.settings.get('application_keys',{}).get('harness'):
+            raise APIError(409,'harness_key','Harness 专用密钥已失效，请重新配置。')
+        if auth.settings['selected_model'] not in {m['id'] for m in await runtime.models()}:
+            raise APIError(409,'model_unavailable','请先选择当前账号可用模型。')
+        return {'ok':True,'inference_tested':False,'message':'DeepSeek Harness 配置、专用密钥和模型目录检查通过；未发送模型测试。'}
+
+    @app.post('/admin/harness/undo')
+    async def harness_undo(request:Request):
+        admin(request)
+        result=await asyncio.to_thread(harness_connector.undo)
+        auth.settings.setdefault('application_keys',{}).pop('harness',None)
+        auth.store.save('settings',auth.settings)
+        result['message']='已移除 DeepSeek Harness 专用提供商并停用密钥。'
+        return result
+
     @app.get('/admin/anythingllm')
     async def anything_status(request:Request):
         admin(request)
@@ -435,6 +480,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         return JSONResponse({'ok':True},background=BackgroundTask(hook))
 
     @app.get('/v1/models')
+    @app.get('/compat/harness/v1/models')
     @app.get('/compat/cline-vscode/v1/models')
     @app.get('/compat/cline/v1/models')
     @app.get('/compat/continue/v1/models')
@@ -499,6 +545,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
 
     @app.post('/compat/openwebui/v1/chat/completions')
     @app.post('/compat/anythingllm/v1/chat/completions')
+    @app.post('/compat/harness/v1/chat/completions')
     @app.post('/compat/cline-vscode/v1/chat/completions')
     @app.post('/compat/cline/v1/chat/completions')
     @app.post('/compat/continue/v1/chat/completions')

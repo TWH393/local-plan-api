@@ -2,7 +2,7 @@
 
 免费、开源发布用的 Windows 本地 ChatGPT 套餐兼容网关。用户在自己的电脑上完成官方 OAuth 登录，应用请求通过本机接口使用该用户获准的套餐能力。
 
-当前版本 0.3.6：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
+当前版本 0.3.7：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
 
 ## 开始使用
 
@@ -129,3 +129,9 @@ Open WebUI（Docker）卡片增加一键配置和撤销按钮。适用于当前 
 ### Cline VS Code extension
 
 应用连接中的 Cline（VS Code）独立配置共享 v1 提供商目录，使用 `/compat/cline-vscode/v1` 和单独密钥。配置后重新加载 VS Code 窗口，在扩展 API Provider 选择 `ChatGPT · Local Plan API`，模型选择 `local-plan-default`。当前适配已检查的 Cline 4.1.25；旧扩展可能不读取该共享目录。它不直接修改 VS Code SQLite 状态库或加密密钥库，也不会自动发送测试消息。桌面版与扩展版可分别撤销。
+
+## DeepSeek Harness
+
+展开应用连接中的 DeepSeek Harness，点击一键配置。它为桌面 profile 的 `cordis.patch.yml` 添加 `llm-pi-ai.providers.local-plan-api`，密钥通过 `.credentials.yaml` 中的独立引用保存；桥内恢复记录用 DPAPI 加密。它保留其他模型、登录账号和插件配置，并与 Harness 的配置写入锁协调。
+
+重新打开 Harness 的模型设置，选择 **ChatGPT · Local Plan API** / `local-plan-default`。若尚未显示，请重开 Harness。使用 `/compat/harness/v1` 的 OpenAI Chat Completions 兼容入口。检查不发送模型推理；实际聊天由用户测试。撤销只删除工具添加的提供商和密钥引用；手动改动的同名配置不会被覆盖。当前适配本机 0.2.1-rc.2 桌面 profile；自定义 home 通过 `DSH_HOME` 指定。

@@ -8,3 +8,5 @@ Official project artwork, used to identify the respective integrations. Logos re
 - cherry: https://raw.githubusercontent.com/CherryHQ/cherry-studio/main/src/renderer/assets/images/logo.png
 
 - cline: official Cline Desktop distribution, `icons/app/classic.png` (https://github.com/cline/cline).
+
+- harness: official DeepSeek Harness desktop distribution, `resources/icon.png` (https://github.com/deepseek-ai/deepseek-harness).
