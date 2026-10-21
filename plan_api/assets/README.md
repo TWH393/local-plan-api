@@ -1,0 +1,8 @@
+# Application logos
+
+Official project artwork, used to identify the respective integrations. Logos remain the property of their respective owners; the project MIT license does not relicense these marks.
+
+- vscode: https://media.githubusercontent.com/media/microsoft/vscode-docs/main/images/logo-stable.png
+- openwebui: https://raw.githubusercontent.com/open-webui/open-webui/main/static/favicon.png
+- anythingllm: https://raw.githubusercontent.com/Mintplex-Labs/anything-llm/master/frontend/public/favicon.png
+- cherry: https://raw.githubusercontent.com/CherryHQ/cherry-studio/main/src/renderer/assets/images/logo.png

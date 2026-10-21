@@ -21,9 +21,10 @@ from .continue_connector import ContinueConnector,MODEL_ALIAS,MODEL_NAME
 from .startup import Startup
 from .anythingllm_connector import AnythingConnector
 from .model_follow import identify,follow_latest
+from .openwebui_connector import OpenWebUIConnector
 
 
-def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anything_connector=None):
+def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anything_connector=None,openwebui_connector=None):
     origin=f'http://127.0.0.1:{port}'
     if auth is None:
         store=store or Store(Path(os.environ.get('LOCAL_PLAN_API_DATA_DIR',
@@ -32,6 +33,7 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
     runtime=runtime or Runtime(auth)
     connector=connector or ContinueConnector(auth.store,origin)
     anything_connector=anything_connector or AnythingConnector(auth.store,origin)
+    openwebui_connector=openwebui_connector or OpenWebUIConnector(auth.store,port)
     app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None)
     app.state.auth=auth;app.state.runtime=runtime
     sessions={}
@@ -295,7 +297,8 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         admin(request)
         key=auth.settings.get('application_keys',{}).get('openwebui','')
         account=auth.accounts['items'].get(auth.accounts['active'],{})
-        return {'enabled':bool(key),'api_key':key,
+        info=await asyncio.to_thread(openwebui_connector.status)
+        return {**info,'enabled':bool(key),'api_key':key,
                 'api_base':f'http://host.docker.internal:{port}/compat/openwebui/v1',
                 'bridge_ready':bool(account.get('access_token') and 'chatgpt.tokens.use.direct' in account.get('scopes',[]))}
 
@@ -316,6 +319,23 @@ def create_app(store=None,port=24664,auth=None,runtime=None,connector=None,anyth
         auth.settings.setdefault('application_keys',{}).pop('openwebui',None)
         auth.store.save('settings',auth.settings)
         return {'ok':True}
+
+    @app.post('/admin/openwebui/connect')
+    async def openwebui_connect(request:Request):
+        admin(request)
+        if runtime.in_flight:raise APIError(409,'request_active','请求处理中，请结束后再配置。')
+        await openwebui_enable(request)
+        result=await asyncio.to_thread(openwebui_connector.connect,auth.settings['application_keys']['openwebui'])
+        result['message']='Open WebUI 已配置并重启，请刷新页面选择 local-plan-default。' if result['ready'] else '配置已保存，Open WebUI 尚在启动；请稍后刷新，或手动重启容器。'
+        return result
+
+    @app.post('/admin/openwebui/undo')
+    async def openwebui_undo(request:Request):
+        admin(request)
+        if runtime.in_flight:raise APIError(409,'request_active','请求处理中，请结束后再恢复。')
+        result=await asyncio.to_thread(openwebui_connector.undo)
+        result['message']='Open WebUI 原连接配置已恢复。' if result['ready'] else '原配置已恢复，请稍后刷新或手动重启 Open WebUI 容器。'
+        return result
 
     @app.post('/admin/stop')
     async def stop(request:Request):
