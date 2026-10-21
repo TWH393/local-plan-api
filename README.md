@@ -4,7 +4,7 @@
 
 免费、开源发布用的 Windows 本地 ChatGPT 套餐兼容网关。用户在自己的电脑上完成官方 OAuth 登录，应用请求通过本机接口使用该用户获准的套餐能力。
 
-当前版本 0.3.7：ChatGPT 授权由本工具独立管理。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
+当前版本 0.3.8：ChatGPT 授权由本工具独立管理。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
 
 ## 当前状态
 
@@ -15,6 +15,7 @@
 | Continue / AnythingLLM / Open WebUI | 已有用户环境连接验证，一键配置仍可能受应用版本影响 |
 | Cline Desktop / Cline VS Code | 已提供独立配置与撤销，部分客户端会话曾出现密钥加载问题，仍需继续实测 |
 | DeepSeek Harness | 已完成桌面 profile 配置写入，实际对话待用户验证 |
+| AstrBot | 支持本机配置写入、检查和撤销，实际聊天待用户验证 |
 | Cherry Studio | 提供下载入口和应用内登录说明 |
 
 “检查连接”只检查本地配置、密钥和模型目录，不会发送推理请求，也不代表所有工具功能都已验证。
@@ -150,3 +151,12 @@ Open WebUI（Docker）卡片增加一键配置和撤销按钮。适用于当前 
 展开应用连接中的 DeepSeek Harness，点击一键配置。它为桌面 profile 的 `cordis.patch.yml` 添加 `llm-pi-ai.providers.local-plan-api`，密钥通过 `.credentials.yaml` 中的独立引用保存；桥内恢复记录用 DPAPI 加密。它保留其他模型、登录账号和插件配置，并与 Harness 的配置写入锁协调。
 
 重新打开 Harness 的模型设置，选择 **ChatGPT · Local Plan API** / `local-plan-default`。若尚未显示，请重开 Harness。使用 `/compat/harness/v1` 的 OpenAI Chat Completions 兼容入口。检查不发送模型推理；实际聊天由用户测试。撤销只删除工具添加的提供商和密钥引用；手动改动的同名配置不会被覆盖。当前适配本机 0.2.1-rc.2 桌面 profile；自定义 home 通过 `DSH_HOME` 指定。
+
+
+## AstrBot
+
+展开 AstrBot 卡片，点击 **一键配置 AstrBot**。自动检测 Windows AstrBot Launcher 的单个实例，新增 `local-plan-api` 提供商和 `local-plan-api/local-plan-default` 模型，使用 `/compat/astrbot/v1` 专用入口与独立本地密钥。其他本机安装可在启动桥前设置 `ASTRBOT_ROOT`，指向包含 `data/cmd_config.json` 的 AstrBot 根目录。多个实例先在卡片中选择目标实例；暂不自动配置 Docker、WSL 或远程实例。
+
+**写入后先重启 AstrBot，再保存 AstrBot 的设置**，避免旧进程覆盖新配置。然后在 AstrBot 服务提供商/模型选择中选择 **local-plan-api/local-plan-default**。原默认模型、其他提供商、QQ/微信平台和插件配置保留，不会自动切换机器人模型或重启机器人。默认别名跟随桥页面的模型设置。
+
+检查只核对磁盘配置、专用密钥和官方模型目录，不发送聊天，也不能证明运行中的 AstrBot 已加载配置。兼容入口接受并忽略客户端自动附带的采样参数及输出 token 上限，实际限制由上游控制；其他不支持的参数仍返回错误。图片和 function tools 使用现有协议转换，实际对话和工具能力留给用户验证；不提供嵌入模型。撤销前请先切换到其他模型；撤销只移除本工具添加的两项并停用专用密钥，随后需重启 AstrBot。原配置备份由 DPAPI 加密。

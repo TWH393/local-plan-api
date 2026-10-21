@@ -10,3 +10,5 @@ Official project artwork, used to identify the respective integrations. Logos re
 - cline: official Cline Desktop distribution, `icons/app/classic.png` (https://github.com/cline/cline).
 
 - harness: official DeepSeek Harness desktop distribution, `resources/icon.png` (https://github.com/deepseek-ai/deepseek-harness).
+
+- astrbot: official AstrBot distribution, `docs/public/logo.png` (https://github.com/AstrBotDevs/AstrBot).
