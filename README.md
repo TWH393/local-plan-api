@@ -2,7 +2,7 @@
 
 免费、开源发布用的 Windows 本地 ChatGPT 套餐兼容网关。用户在自己的电脑上完成官方 OAuth 登录，应用请求通过本机接口使用该用户获准的套餐能力。
 
-当前版本 0.3.5：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
+当前版本 0.3.6：独立于 QQ 机器人，不读取其账号、配置、记忆或密钥。默认端口 `24664`，凭据使用 Windows DPAPI 绑定当前 Windows 用户加密，存放在 `%LOCALAPPDATA%/LocalPlanAPI/`。
 
 ## 开始使用
 
@@ -125,3 +125,7 @@ Open WebUI（Docker）卡片增加一键配置和撤销按钮。适用于当前 
 连接使用 `/compat/cline/v1` 和专用密钥。检查连接只核对配置、密钥及模型目录，不发送推理请求。撤销会移除本工具添加的提供商并停用其密钥；如该提供商被手动修改，会拒绝覆盖。恢复记录使用 Windows DPAPI 加密。写入两个配置文件时若失败，会尝试回滚并保留重试信息。
 
 当前适配 Cline Desktop 的共享 v1 JSON 配置；不修改旧版 VS Code 扩展配置。自定义配置目录通过启动桥时的 `CLINE_DIR` 或 `CLINE_DATA_DIR` 指定。首次使用前请安装、启动 Cline 并完成初始设置。
+
+### Cline VS Code extension
+
+应用连接中的 Cline（VS Code）独立配置共享 v1 提供商目录，使用 `/compat/cline-vscode/v1` 和单独密钥。配置后重新加载 VS Code 窗口，在扩展 API Provider 选择 `Local Plan Api Vscode`，模型选择 `local-plan-default`。当前适配已检查的 Cline 4.1.25；旧扩展可能不读取该共享目录。它不直接修改 VS Code SQLite 状态库或加密密钥库，也不会自动发送测试消息。桌面版与扩展版可分别撤销。

@@ -59,3 +59,18 @@ class ClineTests(unittest.TestCase):
         doc['version']=1;doc['providers'][PROVIDER_ID]={'models':{}};self.write('models.json',doc)
         with self.assertRaises(APIError):self.c.connect('key')
         self.assertEqual(self.read('models.json'),doc)
+
+    def test_desktop_and_vscode_can_connect_and_undo_independently(self):
+        from plan_api.cline_connector import ClineVSCodeConnector
+        (self.folder/'.vscode/extensions/saoudrizwan.claude-dev-4.1.25').mkdir(parents=True)
+        vscode=ClineVSCodeConnector(self.store,'http://127.0.0.1:24664',self.folder,home=self.folder)
+        self.c.connect('desktop-key');vscode.connect('vscode-key')
+        self.assertTrue(self.c.status()['configured']);self.assertTrue(vscode.status()['configured'])
+        self.assertTrue(vscode.status()['installed'])
+        self.assertEqual(self.read('providers.json')['providers']['local-plan-api-vscode']['settings']['baseUrl'],
+                         'http://127.0.0.1:24664/compat/cline-vscode/v1')
+        vscode.undo()
+        self.assertTrue(self.c.status()['configured'])
+        self.assertNotIn('local-plan-api-vscode',self.read('providers.json')['providers'])
+        self.c.undo()
+        for n in FILES:self.assertEqual(self.read(n),self.original[n])

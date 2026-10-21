@@ -15,8 +15,10 @@ FILES = ('models.json', 'providers.json')
 
 
 class ClineConnector:
-    def __init__(self, store, origin, folder=None):
+    def __init__(self, store, origin, folder=None, profile="cline", provider_id=PROVIDER_ID):
         self.store, self.origin = store, origin
+        self.profile, self.provider_id = profile, provider_id
+        self.state_name = profile+"-connection"
         self.folder = Path(folder) if folder else Path(os.environ.get(
             'CLINE_DATA_DIR', str(Path(os.environ.get('CLINE_DIR', str(Path.home()/'.cline')))/'data')))/'settings'
         self.lock = threading.Lock()
@@ -39,16 +41,16 @@ class ClineConnector:
         result = {'installed':all((self.folder/n).is_file() for n in FILES),
                   'configured':False, 'can_undo':False, 'manual_bridge':False, 'error':''}
         with self.lock:
-            state = self.store.load('cline-connection', {})
+            state = self.store.load(self.state_name, {})
             result['can_undo'] = bool(state)
             if not result['installed']:return result
             try:
                 docs = {n:self.read(n)[1] for n in FILES}
                 result['configured'] = bool(state and all(
-                    docs[n]['providers'].get(PROVIDER_ID) == state['entries'][n] for n in FILES))
+                    docs[n]['providers'].get(self.provider_id) == state['entries'][n] for n in FILES))
                 result['manual_bridge'] = any(
-                    v.get('settings', {}).get('baseUrl') in (self.origin+'/v1', self.origin+'/compat/cline/v1')
-                    for k,v in docs['providers.json']['providers'].items() if k != PROVIDER_ID)
+                    v.get('settings', {}).get('baseUrl') in (self.origin+'/v1', self.origin+'/compat/'+self.profile+'/v1')
+                    for k,v in docs['providers.json']['providers'].items() if k != self.provider_id)
             except (APIError, OSError) as exc:
                 result['error'] = exc.message if isinstance(exc, APIError) else '无法读取 Cline 配置。'
         return result
@@ -66,9 +68,9 @@ class ClineConnector:
             Path(temp).unlink(missing_ok=True)
 
     def entries(self, key):
-        base = self.origin+'/compat/cline/v1'
+        base = self.origin+'/compat/'+self.profile+'/v1'
         return {
-            'providers.json':{'settings':{'provider':PROVIDER_ID, 'apiKey':key,
+            'providers.json':{'settings':{'provider':self.provider_id, 'apiKey':key,
                 'model':MODEL_ALIAS, 'protocol':'openai-chat', 'client':'openai-compatible', 'baseUrl':base},
                 'updatedAt':datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00','Z'),
                 'tokenSource':'manual'},
@@ -81,7 +83,7 @@ class ClineConnector:
         # provider and top-level field, including OAuth refreshes and user choices.
         snapshots = {n:self.read(n) for n in FILES}
         for n,(_,doc) in snapshots.items():
-            existing = doc['providers'].get(PROVIDER_ID)
+            existing = doc['providers'].get(self.provider_id)
             if existing is not None and existing != entries[n]:
                 raise APIError(409, 'cline_changed', 'Cline 中的同名连接已被手动修改，未覆盖。')
         changes = []
@@ -89,14 +91,14 @@ class ClineConnector:
         try:
             for name in names:
                 raw, doc = self.read(name)
-                existing = doc['providers'].get(PROVIDER_ID)
+                existing = doc['providers'].get(self.provider_id)
                 if existing is not None and existing != entries[name]:
                     raise APIError(409, 'cline_changed', 'Cline 配置刚被其他程序修改，请重试。')
                 if removing:
-                    doc['providers'].pop(PROVIDER_ID, None)
-                    if name == 'providers.json' and doc.get('lastUsedProvider') == PROVIDER_ID:
+                    doc['providers'].pop(self.provider_id, None)
+                    if name == 'providers.json' and doc.get('lastUsedProvider') == self.provider_id:
                         doc.pop('lastUsedProvider', None)
-                else:doc['providers'][PROVIDER_ID] = copy.deepcopy(entries[name])
+                else:doc['providers'][self.provider_id] = copy.deepcopy(entries[name])
                 new = (json.dumps(doc, ensure_ascii=False, indent=2)+'\n').encode('utf-8')
                 if json.loads(raw.decode('utf-8-sig')) != doc:
                     self.replace(name, raw, new);changes.append((name, raw, new))
@@ -111,22 +113,35 @@ class ClineConnector:
 
     def connect(self, key):
         with self.lock:
-            state = self.store.load('cline-connection', {})
+            state = self.store.load(self.state_name, {})
             entries = state.get('entries') or self.entries(key)
             if state and entries['providers.json']['settings']['apiKey'] != key:
                 raise APIError(409, 'cline_key', 'Cline 专用密钥已变化，请先撤销连接再重新配置。')
             if not state:
                 for name in FILES:
-                    if PROVIDER_ID in self.read(name)[1]['providers']:
+                    if self.provider_id in self.read(name)[1]['providers']:
                         raise APIError(409, 'cline_changed', 'Cline 中已存在同名提供商，未覆盖。')
-                self.store.save('cline-connection', {'entries':entries})
+                self.store.save(self.state_name, {'entries':entries})
             changed = self.apply(entries)
-            return {'ok':True, 'changed':changed, 'provider_id':PROVIDER_ID, 'model_name':MODEL_NAME}
+            return {'ok':True, 'changed':changed, 'provider_id':self.provider_id, 'model_name':MODEL_NAME}
 
     def undo(self):
         with self.lock:
-            state = self.store.load('cline-connection', {})
+            state = self.store.load(self.state_name, {})
             if not state:return {'ok':True, 'changed':False}
             changed = self.apply(state['entries'], removing=True)
-            self.store.save('cline-connection', {})
+            self.store.save(self.state_name, {})
             return {'ok':True, 'changed':changed}
+
+
+class ClineVSCodeConnector(ClineConnector):
+    def __init__(self, store, origin, folder=None, home=None):
+        super().__init__(store, origin, folder, 'cline-vscode', 'local-plan-api-vscode')
+        self.home=Path(home) if home else Path.home()
+
+    def status(self):
+        result=super().status()
+        result['installed']=result['installed'] and any(
+            p.is_dir() for base in ('.vscode','.vscode-insiders')
+            for p in (self.home/base/'extensions').glob('saoudrizwan.claude-dev-*'))
+        return result
